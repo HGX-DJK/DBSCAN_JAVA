@@ -76,10 +76,9 @@ public class ClusterService {
                             }
                         }
                         
-                        // 至少需要两个数值字段
                         if (coordinates.size() >= 2) {
                             double[] coordArray = coordinates.stream().mapToDouble(Double::doubleValue).toArray();
-                            points.add(new DBSCAN.Point(coordArray));
+                            points.add(new DBSCAN.Point(coordArray, csvRecord.toMap()));
                         } else {
                             logger.warn("Skipping record with insufficient numeric fields: {}", csvRecord);
                         }
@@ -88,7 +87,7 @@ public class ClusterService {
                     
                     // 使用经纬度创建点
                     double[] coordArray = {lng, lat};
-                    points.add(new DBSCAN.Point(coordArray));
+                    points.add(new DBSCAN.Point(coordArray, csvRecord.toMap()));
                 } catch (Exception e) {
                     logger.warn("Skipping invalid record: {}", csvRecord);
                 }
@@ -134,7 +133,7 @@ public class ClusterService {
         for (DBSCAN.Point point : points) {
             if (point.getClusterId() == -1) {
                 noiseCount++;
-                noisePointsList.add(new ClusterResponse.Point(point.getCoordinates()));
+                noisePointsList.add(new ClusterResponse.Point(point.getCoordinates(), point.getExtraData()));
             }
         }
         response.setNoisePoints(noiseCount);
@@ -148,7 +147,7 @@ public class ClusterService {
             
             List<ClusterResponse.Point> pointList = new ArrayList<>();
             for (DBSCAN.Point point : validClusters.get(i)) {
-                pointList.add(new ClusterResponse.Point(point.getCoordinates()));
+                pointList.add(new ClusterResponse.Point(point.getCoordinates(), point.getExtraData()));
             }
             cluster.setPoints(pointList);
             clusterList.add(cluster);

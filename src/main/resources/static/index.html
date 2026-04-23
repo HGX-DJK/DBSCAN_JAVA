@@ -692,22 +692,22 @@
                     
                     // 构建弹窗内容
                     let popupContent = `
-                        <div style="font-size: 14px;">
-                            <h5>点信息</h5>
-                            <p><strong>集群 ID:</strong> ${isFilteredNoise ? '-1 (已过滤噪声)' : cluster.clusterId}</p>
-                            <p><strong>点索引:</strong> ${pointIndex}</p>
-                            <p><strong>经度:</strong> ${lng.toFixed(6)}</p>
-                            <p><strong>纬度:</strong> ${lat.toFixed(6)}</p>
-                            <p><strong>集群大小:</strong> ${cluster.points.length}个点</p>
+                        <div style="font-size: 13px; max-height: 250px; overflow-y: auto; padding-right: 5px;">
+                            <h5 style="margin: 0 0 8px 0; padding-bottom: 5px; border-bottom: 1px solid #eee; color: #374151; font-size: 14px;">空间聚类信息</h5>
+                            <p style="margin: 4px 0;"><strong>集群 ID:</strong> ${isFilteredNoise ? '-1 (已过滤噪声)' : cluster.clusterId}</p>
+                            <p style="margin: 4px 0;"><strong>集群大小:</strong> ${cluster.points.length} 个点</p>
                     `;
                     
-                    // 如果有更多坐标维度，显示所有坐标
-                    if (point.coordinates && point.coordinates.length > 2) {
-                        popupContent += '<p><strong>其他坐标:</strong></p><ul>';
-                        for (let i = 2; i < point.coordinates.length; i++) {
-                            popupContent += `<li>维度 ${i}: ${point.coordinates[i].toFixed(4)}</li>`;
+                    if (point.extraData) {
+                        popupContent += '<h5 style="margin: 12px 0 8px 0; padding-bottom: 5px; border-bottom: 1px solid #eee; color: #374151; font-size: 14px;">CSV 原始数据</h5>';
+                        for (let key in point.extraData) {
+                            popupContent += `<p style="margin: 4px 0;"><strong>${key}:</strong> ${point.extraData[key]}</p>`;
                         }
-                        popupContent += '</ul>';
+                    } else {
+                        popupContent += `
+                            <p style="margin: 4px 0;"><strong>经度:</strong> ${lng.toFixed(6)}</p>
+                            <p style="margin: 4px 0;"><strong>纬度:</strong> ${lat.toFixed(6)}</p>
+                        `;
                     }
                     
                     popupContent += '</div>';
@@ -750,21 +750,21 @@
                     
                     // 构建弹窗内容
                     let popupContent = `
-                        <div style="font-size: 14px;">
-                            <h5>点信息</h5>
-                            <p><strong>集群 ID:</strong> -1 (噪声点)</p>
-                            <p><strong>点索引:</strong> ${index}</p>
-                            <p><strong>经度:</strong> ${lng.toFixed(6)}</p>
-                            <p><strong>纬度:</strong> ${lat.toFixed(6)}</p>
+                        <div style="font-size: 13px; max-height: 250px; overflow-y: auto; padding-right: 5px;">
+                            <h5 style="margin: 0 0 8px 0; padding-bottom: 5px; border-bottom: 1px solid #eee; color: #374151; font-size: 14px;">空间聚类信息</h5>
+                            <p style="margin: 4px 0;"><strong>集群 ID:</strong> -1 (噪声点)</p>
                     `;
                     
-                    // 如果有更多坐标维度，显示所有坐标
-                    if (point.coordinates && point.coordinates.length > 2) {
-                        popupContent += '<p><strong>其他坐标:</strong></p><ul>';
-                        for (let i = 2; i < point.coordinates.length; i++) {
-                            popupContent += `<li>维度 ${i}: ${point.coordinates[i].toFixed(4)}</li>`;
+                    if (point.extraData) {
+                        popupContent += '<h5 style="margin: 12px 0 8px 0; padding-bottom: 5px; border-bottom: 1px solid #eee; color: #374151; font-size: 14px;">CSV 原始数据</h5>';
+                        for (let key in point.extraData) {
+                            popupContent += `<p style="margin: 4px 0;"><strong>${key}:</strong> ${point.extraData[key]}</p>`;
                         }
-                        popupContent += '</ul>';
+                    } else {
+                        popupContent += `
+                            <p style="margin: 4px 0;"><strong>经度:</strong> ${lng.toFixed(6)}</p>
+                            <p style="margin: 4px 0;"><strong>纬度:</strong> ${lat.toFixed(6)}</p>
+                        `;
                     }
                     
                     popupContent += '</div>';

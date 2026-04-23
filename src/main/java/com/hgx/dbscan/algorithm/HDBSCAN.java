@@ -107,6 +107,10 @@ public class HDBSCAN {
     }
 
     private List<HierarchyNode> buildHierarchy(int n, MSTEdge[] mst) {
+        // 关键修复：Prim 算法生成的边不是按权重排序的。
+        // 构建层次树（单连接层次聚类）必须严格按照边权重升序排列！
+        Arrays.sort(mst, (a, b) -> Double.compare(a.weight, b.weight));
+
         UnionFind uf = new UnionFind(n);
         HierarchyNode[] currentNodes = new HierarchyNode[n];
         for (int i = 0; i < n; i++) {
@@ -123,7 +127,8 @@ public class HDBSCAN {
                 parent.left = currentNodes[root1];
                 parent.right = currentNodes[root2];
                 // parent.lambda 是这个簇“分裂”成 left 和 right 的密度（死亡密度）
-                parent.lambda = edge.weight > 0 ? 1.0 / edge.weight : 0;
+                // 修复：如果距离为0，意味着完全重合的点，其分裂密度应该趋于无穷大
+                parent.lambda = edge.weight > 1e-12 ? 1.0 / edge.weight : Double.MAX_VALUE;
                 
                 // 设置子簇的“出生”密度为父簇的“分裂”密度
                 parent.left.parentLambda = parent.lambda;

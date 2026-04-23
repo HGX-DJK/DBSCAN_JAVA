@@ -72,9 +72,23 @@ public class ClusterResponse {
 
     public static class Point {
         private double[] coordinates;
+        private java.util.Map<String, String> extraData;
 
         public Point(double[] coordinates) {
+            this(coordinates, null);
+        }
+
+        public Point(double[] coordinates, java.util.Map<String, String> extraData) {
             this.coordinates = coordinates;
+            this.extraData = extraData;
+        }
+
+        public java.util.Map<String, String> getExtraData() {
+            return extraData;
+        }
+
+        public void setExtraData(java.util.Map<String, String> extraData) {
+            this.extraData = extraData;
         }
 
         public double[] getCoordinates() {

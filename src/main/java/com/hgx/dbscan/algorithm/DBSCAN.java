@@ -176,11 +176,25 @@ public class DBSCAN {
         private boolean visited;
         private int clusterId;
         private int id;
+        private java.util.Map<String, String> extraData;
 
         public Point(double[] coordinates) {
+            this(coordinates, null);
+        }
+
+        public Point(double[] coordinates, java.util.Map<String, String> extraData) {
             this.coordinates = coordinates;
             this.visited = false;
             this.clusterId = -1;
+            this.extraData = extraData;
+        }
+
+        public java.util.Map<String, String> getExtraData() {
+            return extraData;
+        }
+
+        public void setExtraData(java.util.Map<String, String> extraData) {
+            this.extraData = extraData;
         }
 
         public int getId() {
