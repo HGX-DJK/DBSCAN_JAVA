@@ -2,18 +2,22 @@ package com.hgx.dbscan.controller;
 
 import com.hgx.dbscan.model.ClusterResponse;
 import com.hgx.dbscan.service.ClusterService;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -74,6 +78,59 @@ public class ClusterController {
             Map<String, String> error = new HashMap<>();
             error.put("error", "Internal server error");
             return new ResponseEntity<>(error, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @GetMapping("/cluster/download")
+    public ResponseEntity<byte[]> downloadClusteredData(
+            @RequestParam("downloadId") String downloadId) {
+        try {
+            List<Map<String, String>> clusteredData = clusterService.getClusteredData(downloadId);
+
+            if (clusteredData == null || clusteredData.isEmpty()) {
+                logger.warn("Download request: No clustered data found for downloadId: {}", downloadId);
+                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+            }
+
+            // Generate CSV
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            CSVPrinter csvPrinter = null;
+            try {
+                // Get headers from the first map (assuming all maps have the same keys)
+                List<String> headers = new ArrayList<>(clusteredData.get(0).keySet());
+                // Ensure "clusterId" is the last header
+                if (headers.contains("clusterId")) {
+                    headers.remove("clusterId");
+                    headers.add("clusterId");
+                }
+
+                csvPrinter = new CSVPrinter(new java.io.OutputStreamWriter(bos), CSVFormat.DEFAULT.withHeader(headers.toArray(new String[0])));
+
+                for (Map<String, String> row : clusteredData) {
+                    List<String> rowValues = new ArrayList<>();
+                    for (String header : headers) {
+                        rowValues.add(row.getOrDefault(header, ""));
+                    }
+                    csvPrinter.printRecord(rowValues);
+                }
+                csvPrinter.flush();
+            } finally {
+                if (csvPrinter != null) {
+                    csvPrinter.close();
+                }
+            }
+
+            byte[] csvBytes = bos.toByteArray();
+
+            HttpHeaders httpHeaders = new HttpHeaders();
+            httpHeaders.setContentType(MediaType.parseMediaType("text/csv"));
+            httpHeaders.setContentDispositionFormData("attachment", "clustered_data.csv");
+
+            return new ResponseEntity<>(csvBytes, httpHeaders, HttpStatus.OK);
+
+        } catch (Exception e) {
+            logger.error("Error during clustered data download for downloadId {}: {}", downloadId, e.getMessage(), e);
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 }

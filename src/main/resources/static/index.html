@@ -482,9 +482,14 @@
                 </div>
             </div>
             
-            <div class="result" id="result" style="display: none;">
+            <div id="result" class="result" style="display: none;">
                 <h2>聚类结果</h2>
-                <div id="resultContent"></div>
+                <div id="resultContent">
+                    <!-- Statistics and cluster details will be injected here by displayResult -->
+                </div>
+                <div id="downloadSection" style="display: none; margin-top: 20px;">
+                    <button id="downloadCsvBtn" class="execute-btn">下载聚类结果 (CSV)</button>
+                </div>
             </div>
         </div>
     </div>
@@ -527,6 +532,11 @@
             }
         });
         
+        let currentDownloadId = null; // Declare global variable to store downloadId
+
+        // Initial state: hide download button
+        document.getElementById('downloadSection').style.display = 'none';
+
         // 执行聚类
         document.getElementById('executeBtn').addEventListener('click', function() {
             const fileInput = document.getElementById('file');
@@ -550,7 +560,9 @@
             
             document.getElementById('result').style.display = 'none';
             document.getElementById('error').style.display = 'none';
-            
+            document.getElementById('downloadSection').style.display = 'none'; // Hide download button on new clustering
+            currentDownloadId = null; // Clear previous downloadId
+
             // 清空地图
             markerLayer.clear();
             
@@ -569,11 +581,25 @@
             .then(data => {
                 displayResult(data);
                 displayOnMap(data);
+                if (data.downloadId) { // If downloadId is present, enable download
+                    currentDownloadId = data.downloadId;
+                    document.getElementById('downloadSection').style.display = 'block';
+                }
             })
             .catch(error => {
                 document.getElementById('error').textContent = error.message;
                 document.getElementById('error').style.display = 'block';
             });
+        });
+        
+        // Download button click handler
+        document.getElementById('downloadCsvBtn').addEventListener('click', function() {
+            if (currentDownloadId) {
+                const downloadUrl = `/api/cluster/download?downloadId=${currentDownloadId}`;
+                window.location.href = downloadUrl; // Trigger download
+            } else {
+                alert('没有可下载的聚类结果。请先执行聚类。');
+            }
         });
         
         function displayResult(data) {

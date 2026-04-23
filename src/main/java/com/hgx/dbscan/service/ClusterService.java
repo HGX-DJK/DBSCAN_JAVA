@@ -15,11 +15,17 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class ClusterService {
 
     private static final Logger logger = LoggerFactory.getLogger(ClusterService.class);
+
+    // Cache for clustered data for download, keyed by a UUID
+    private final Map<String, List<Map<String, String>>> clusterResultsCache = new ConcurrentHashMap<>();
 
     public ClusterResponse cluster(InputStream inputStream, double eps, int minPts, int minClusterSize, String lngField, String latField, String algorithm) throws Exception {
         logger.info("Starting {} clustering with eps={}, minPts={}, minClusterSize={}, lngField={}, latField={}", 
@@ -45,6 +51,16 @@ public class ClusterService {
             // 构建响应
             ClusterResponse response = buildResponse(points, clusters, minClusterSize);
             logger.info("Response built successfully");
+
+            // Prepare data for download and store in cache
+            List<Map<String, String>> dataForDownload = new ArrayList<>();
+            for (DBSCAN.Point point : points) {
+                dataForDownload.add(point.getExtraData());
+            }
+            String downloadId = UUID.randomUUID().toString();
+            clusterResultsCache.put(downloadId, dataForDownload);
+            response.setDownloadId(downloadId);
+
             return response;
         } catch (Exception e) {
             logger.error("Error during clustering: {}", e.getMessage(), e);
@@ -122,11 +138,16 @@ public class ClusterService {
             }
         }
 
+        // Ensure all points have their final clusterId in extraData for download purposes
+        for (DBSCAN.Point point : points) {
+            point.getExtraData().put("clusterId", String.valueOf(point.getClusterId()));
+        }
+
         // 3. 构建响应对象
         ClusterResponse response = new ClusterResponse();
         response.setTotalClusters(validClusters.size());
         response.setTotalPoints(points.size());
-        
+
         // 统计噪声点并收集噪声点信息
         int noiseCount = 0;
         List<ClusterResponse.Point> noisePointsList = new ArrayList<>();
@@ -138,13 +159,13 @@ public class ClusterService {
         }
         response.setNoisePoints(noiseCount);
         response.setNoisePointsList(noisePointsList);
-        
+
         // 构建最终集群详情
         List<ClusterResponse.Cluster> clusterList = new ArrayList<>();
         for (int i = 0; i < validClusters.size(); i++) {
             ClusterResponse.Cluster cluster = new ClusterResponse.Cluster();
             cluster.setClusterId(i);
-            
+
             List<ClusterResponse.Point> pointList = new ArrayList<>();
             for (DBSCAN.Point point : validClusters.get(i)) {
                 pointList.add(new ClusterResponse.Point(point.getCoordinates(), point.getExtraData()));
@@ -153,7 +174,11 @@ public class ClusterService {
             clusterList.add(cluster);
         }
         response.setClusters(clusterList);
-        
+
         return response;
+    }
+
+    public List<Map<String, String>> getClusteredData(String downloadId) {
+        return clusterResultsCache.get(downloadId);
     }
 }

@@ -3,15 +3,21 @@ package com.hgx.dbscan.model;
 import java.util.List;
 
 public class ClusterResponse {
+    private String downloadId;
     private int totalClusters;
     private int totalPoints;
     private int noisePoints;
     private List<Cluster> clusters;
     private List<Point> noisePointsList;
 
-    public int getTotalClusters() {
-        return totalClusters;
+    public String getDownloadId() {
+        return downloadId;
     }
+
+    public void setDownloadId(String downloadId) {
+        this.downloadId = downloadId;
+    }
+
 
     public void setTotalClusters(int totalClusters) {
         this.totalClusters = totalClusters;
