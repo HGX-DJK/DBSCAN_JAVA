@@ -2,11 +2,10 @@ package com.hgx.dbscan.service;
 
 import com.hgx.dbscan.algorithm.DBSCAN;
 import com.hgx.dbscan.algorithm.HDBSCAN;
-import com.hgx.dbscan.algorithm.ST_DBSCAN;
+import com.hgx.dbscan.algorithm.STDBSCAN;
 import com.hgx.dbscan.model.ClusterResponse;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
-import org.apache.commons.csv.CSVRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -49,7 +48,7 @@ public class ClusterService {
                 HDBSCAN hdbscan = new HDBSCAN(eps, minPts, minClusterSize);
                 clusters = hdbscan.cluster(points);
             } else if ("stdbscan".equalsIgnoreCase(algorithm)) {
-                ST_DBSCAN stdbscan = new ST_DBSCAN(eps, minPts, minClusterSize, timeEps);
+                STDBSCAN stdbscan = new STDBSCAN(eps, minPts, minClusterSize, timeEps);
                 clusters = stdbscan.cluster(points);
             } else {
                 // 默认使用DBSCAN

@@ -37,7 +37,7 @@ public class ClusteringTest {
         // 孤立噪声点
         points.add(new DBSCAN.Point(new double[]{9999.0, 9999.0}, baseTime));
 
-        ST_DBSCAN stdbscan = new ST_DBSCAN(1.5, 3, 3, timeEps);
+        STDBSCAN stdbscan = new STDBSCAN(1.5, 3, 3, timeEps);
         List<List<DBSCAN.Point>> clusters = stdbscan.cluster(points);
 
         // 只有 Cluster A（3 个点）应该成为有效集群
@@ -64,7 +64,7 @@ public class ClusteringTest {
         points.add(new DBSCAN.Point(new double[]{5000.1, 5000.0}, baseTime + 300_000L));
         points.add(new DBSCAN.Point(new double[]{5000.0, 5000.1}, baseTime + 900_000L));
 
-        ST_DBSCAN stdbscan = new ST_DBSCAN(1.5, 3, 3, timeEps);
+        STDBSCAN stdbscan = new STDBSCAN(1.5, 3, 3, timeEps);
         List<List<DBSCAN.Point>> clusters = stdbscan.cluster(points);
 
         assertEquals(2, clusters.size(), "应发现 2 个集群");
@@ -83,7 +83,7 @@ public class ClusteringTest {
         points.add(new DBSCAN.Point(new double[]{0.1, 0.0}, 10_000L));
         points.add(new DBSCAN.Point(new double[]{0.0, 0.1}, 20_000L));
 
-        ST_DBSCAN stdbscan = new ST_DBSCAN(1.5, 3, 3, timeEps);
+        STDBSCAN stdbscan = new STDBSCAN(1.5, 3, 3, timeEps);
         List<List<DBSCAN.Point>> clusters = stdbscan.cluster(points);
 
         assertEquals(0, clusters.size(), "时间间距超出 timeEps，应无集群");
