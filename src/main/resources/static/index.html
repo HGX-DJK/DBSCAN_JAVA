@@ -442,6 +442,11 @@
                         <label for="latField">纬度字段名</label>
                         <input type="text" id="latField" name="latField" value="lat">
                     </div>
+
+                    <div class="form-group" id="timeFieldGroup" style="display: none;">
+                        <label for="timeField">时间戳字段名</label>
+                        <input type="text" id="timeField" name="timeField" value="timestamp">
+                    </div>
                     
                     <div class="form-group">
                         <label for="minClusterSize">最小聚类大小</label>
@@ -464,12 +469,21 @@
                                 <input type="radio" id="hdbscan" name="algorithm" value="hdbscan">
                                 <label for="hdbscan">HDBSCAN</label>
                             </div>
+                            <div>
+                                <input type="radio" id="stdbscan" name="algorithm" value="stdbscan">
+                                <label for="stdbscan">ST-DBSCAN</label>
+                            </div>
                         </div>
                     </div>
 
                     <div class="form-group" id="epsGroup">
                         <label for="eps">距离阈值 (epsilon) (千米)</label>
                         <input type="number" id="eps" name="eps" step="0.1" min="0.1" value="1.0">
+                    </div>
+
+                    <div class="form-group" id="timeEpsGroup" style="display: none;">
+                        <label for="timeEps">时间阈值 (timeEps) (分钟)</label>
+                        <input type="number" id="timeEps" name="timeEps" step="1" min="1" value="60"> <!-- Default to 1 hour in minutes -->
                     </div>
                     
                     <button class="execute-btn" id="executeBtn">执行聚类分析</button>
@@ -511,15 +525,26 @@
 
         // 算法切换监听
         const epsGroup = document.getElementById('epsGroup');
+        const timeEpsGroup = document.getElementById('timeEpsGroup');
+        const timeFieldGroup = document.getElementById('timeFieldGroup'); // New
+
         document.querySelectorAll('input[name="algorithm"]').forEach(radio => {
             radio.addEventListener('change', function() {
-                if (this.value === 'hdbscan') {
-                    epsGroup.style.display = 'none';
-                } else {
+                epsGroup.style.display = 'none';
+                timeEpsGroup.style.display = 'none';
+                timeFieldGroup.style.display = 'none'; // New
+
+                if (this.value === 'dbscan') {
                     epsGroup.style.display = 'block';
+                } else if (this.value === 'stdbscan') {
+                    epsGroup.style.display = 'block';
+                    timeEpsGroup.style.display = 'block';
+                    timeFieldGroup.style.display = 'block'; // New
                 }
             });
         });
+        // Initialize visibility on page load
+        document.querySelector('input[name="algorithm"]:checked').dispatchEvent(new Event('change'));
         
         // 文件选择
         document.getElementById('selectFileBtn').addEventListener('click', function() {
@@ -548,15 +573,44 @@
             
             const formData = new FormData();
             formData.append('file', fileInput.files[0]);
-            formData.append('eps', document.getElementById('eps').value);
-            formData.append('minPts', document.getElementById('minPts').value);
             formData.append('minClusterSize', document.getElementById('minClusterSize').value);
+            formData.append('minPts', document.getElementById('minPts').value);
             formData.append('lngField', document.getElementById('lngField').value);
             formData.append('latField', document.getElementById('latField').value);
             
             // 获取选中的算法
-            const algorithm = document.querySelector('input[name="algorithm"]:checked').value;
-            formData.append('algorithm', algorithm);
+            const selectedAlgorithm = document.querySelector('input[name="algorithm"]:checked').value;
+            formData.append('algorithm', selectedAlgorithm);
+
+            if (selectedAlgorithm === 'stdbscan') {
+                formData.append('timeField', document.getElementById('timeField').value);
+                // Convert timeEps from minutes to milliseconds for ST-DBSCAN
+                const timeEpsMinutes = parseFloat(document.getElementById('timeEps').value);
+                if (isNaN(timeEpsMinutes) || timeEpsMinutes <= 0) {
+                    document.getElementById('error').textContent = 'ST-DBSCAN算法的时间阈值 (timeEps) 必须为正数。';
+                    document.getElementById('error').style.display = 'block';
+                    return;
+                }
+                formData.append('timeEps', timeEpsMinutes * 60 * 1000); // Convert minutes to milliseconds
+            } else {
+                // For non-ST-DBSCAN algorithms, timeEps and timeField are not relevant
+                formData.append('timeEps', 0); // Send a default value if not ST-DBSCAN
+                formData.append('timeField', ''); // Send empty if not ST-DBSCAN
+            }
+
+            // Always append eps for DBSCAN and ST-DBSCAN
+            if (selectedAlgorithm === 'dbscan' || selectedAlgorithm === 'stdbscan') {
+                const epsValue = parseFloat(document.getElementById('eps').value);
+                if (isNaN(epsValue) || epsValue <= 0) {
+                    document.getElementById('error').textContent = '距离阈值 (epsilon) 必须为正数。';
+                    document.getElementById('error').style.display = 'block';
+                    return;
+                }
+                formData.append('eps', epsValue);
+            } else {
+                // For HDBSCAN, eps is not directly used in the same way, send a default value
+                formData.append('eps', 0);
+            }
             
             document.getElementById('result').style.display = 'none';
             document.getElementById('error').style.display = 'none';
@@ -603,6 +657,7 @@
         });
         
         function displayResult(data) {
+
             const resultContent = document.getElementById('resultContent');
             
             // 构建统计卡片
@@ -614,7 +669,7 @@
                     </div>
                     <div class="stat-card">
                         <h3>总集群数</h3>
-                        <p>${data.totalClusters}</p>
+                        <p>${data.clusters.length}</p>
                     </div>
                     <div class="stat-card">
                         <h3>噪声点数</h3>
@@ -760,7 +815,7 @@
                     marker.on('mouseenter', function (e) {
                         e.target.openInfoWindow(e.coordinate);
                     }).on('mouseout', function (e) {
-                        e.target.closeInfoWindow();
+                        // e.target.closeInfoWindow();
                     });
                     
                     markers.push(marker);
@@ -817,7 +872,7 @@
                     marker.on('mouseenter', function (e) {
                         e.target.openInfoWindow(e.coordinate);
                     }).on('mouseout', function (e) {
-                        e.target.closeInfoWindow();
+                        // e.target.closeInfoWindow();
                     });
                     
                     markers.push(marker);

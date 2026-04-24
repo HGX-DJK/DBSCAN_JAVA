@@ -32,11 +32,13 @@ public class ClusterController {
     @PostMapping("/cluster")
     public ResponseEntity<?> cluster(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("eps") double eps,
+            @RequestParam(value = "eps", defaultValue = "0.0") double eps, // Default to 0.0, as it might not be used by all algorithms
             @RequestParam("minPts") int minPts,
             @RequestParam("minClusterSize") int minClusterSize,
             @RequestParam(value = "lngField", defaultValue = "lng") String lngField,
             @RequestParam(value = "latField", defaultValue = "lat") String latField,
+            @RequestParam(value = "timeField", defaultValue = "timestamp") String timeField,
+            @RequestParam(value = "timeEps", defaultValue = "0") long timeEps,
             @RequestParam(value = "algorithm", defaultValue = "dbscan") String algorithm) {
         try {
             // 验证文件
@@ -66,7 +68,7 @@ public class ClusterController {
             }
 
             // 执行聚类
-            ClusterResponse response = clusterService.cluster(file.getInputStream(), eps, minPts, minClusterSize, lngField, latField, algorithm);
+            ClusterResponse response = clusterService.cluster(file.getInputStream(), eps, minPts, minClusterSize, lngField, latField, timeField, timeEps, algorithm);
             return new ResponseEntity<>(response, HttpStatus.OK);
         } catch (IllegalArgumentException e) {
             logger.warn("Invalid parameters: {}", e.getMessage());

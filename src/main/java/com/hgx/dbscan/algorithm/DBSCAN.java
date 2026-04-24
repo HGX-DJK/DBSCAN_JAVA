@@ -6,10 +6,10 @@ import java.util.List;
 
 public class DBSCAN {
 
-    private double eps;
-    private int minPts;
-    private int minClusterSize;
-    private DistanceMetric explicitMetric;
+    protected double eps;
+    protected int minPts;
+    protected int minClusterSize;
+    protected DistanceMetric explicitMetric;
 
     public DBSCAN(double eps, int minPts, int minClusterSize) {
         this(eps, minPts, minClusterSize, null);
@@ -93,7 +93,7 @@ public class DBSCAN {
     /**
      * 城市级投影优化：将经纬度投影到以公里为单位的平面，以提高欧氏距离计算的精度和速度
      */
-    private void projectPointsToKm(List<Point> points) {
+    protected void projectPointsToKm(List<Point> points) {
         if (points.isEmpty()) return;
 
         // 借鉴 Rust 版：使用全量数据的平均纬度作为投影基准，减少畸变
@@ -115,7 +115,7 @@ public class DBSCAN {
         }
     }
 
-    private DistanceMetric determineMetric(List<Point> points) {
+    protected DistanceMetric determineMetric(List<Point> points) {
         if (points.size() > 0) {
             double[] coords = points.get(0).getCoordinates();
             if (coords.length == 2 && isGeoCoordinates(coords, coords)) {
@@ -125,7 +125,7 @@ public class DBSCAN {
         return new DistanceMetric.EuclideanMetric();
     }
 
-    private boolean isGeoCoordinates(double[] coord1, double[] coord2) {
+    protected boolean isGeoCoordinates(double[] coord1, double[] coord2) {
         // 检查坐标是否在经纬度范围内
         return Math.abs(coord1[0]) <= 180 && Math.abs(coord1[1]) <= 90 &&
                Math.abs(coord2[0]) <= 180 && Math.abs(coord2[1]) <= 90;
@@ -176,14 +176,24 @@ public class DBSCAN {
         private boolean visited;
         private int clusterId;
         private int id;
+        private long timestamp; // 新增时间戳字段
         private java.util.Map<String, String> extraData;
 
         public Point(double[] coordinates) {
-            this(coordinates, null);
+            this(coordinates, 0, null); // 默认时间戳为0
+        }
+
+        public Point(double[] coordinates, long timestamp) {
+            this(coordinates, timestamp, null);
         }
 
         public Point(double[] coordinates, java.util.Map<String, String> extraData) {
+            this(coordinates, 0, extraData); // 默认时间戳为0
+        }
+
+        public Point(double[] coordinates, long timestamp, java.util.Map<String, String> extraData) {
             this.coordinates = coordinates;
+            this.timestamp = timestamp;
             this.visited = false;
             this.clusterId = -1;
             this.extraData = extraData;
@@ -203,6 +213,14 @@ public class DBSCAN {
 
         public void setId(int id) {
             this.id = id;
+        }
+
+        public long getTimestamp() {
+            return timestamp;
+        }
+
+        public void setTimestamp(long timestamp) {
+            this.timestamp = timestamp;
         }
 
         public double[] getCoordinates() {

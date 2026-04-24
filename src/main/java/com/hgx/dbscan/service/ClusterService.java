@@ -2,6 +2,7 @@ package com.hgx.dbscan.service;
 
 import com.hgx.dbscan.algorithm.DBSCAN;
 import com.hgx.dbscan.algorithm.HDBSCAN;
+import com.hgx.dbscan.algorithm.ST_DBSCAN;
 import com.hgx.dbscan.model.ClusterResponse;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
@@ -13,6 +14,10 @@ import org.springframework.stereotype.Service;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -23,17 +28,19 @@ import java.util.concurrent.ConcurrentHashMap;
 public class ClusterService {
 
     private static final Logger logger = LoggerFactory.getLogger(ClusterService.class);
+    // DateTimeFormatter 是不可变且线程安全的，可安全地共享为静态字段
+    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     // Cache for clustered data for download, keyed by a UUID
     private final Map<String, List<Map<String, String>>> clusterResultsCache = new ConcurrentHashMap<>();
 
-    public ClusterResponse cluster(InputStream inputStream, double eps, int minPts, int minClusterSize, String lngField, String latField, String algorithm) throws Exception {
-        logger.info("Starting {} clustering with eps={}, minPts={}, minClusterSize={}, lngField={}, latField={}", 
-                algorithm, eps, minPts, minClusterSize, lngField, latField);
+    public ClusterResponse cluster(InputStream inputStream, double eps, int minPts, int minClusterSize, String lngField, String latField, String timeField, long timeEps, String algorithm) throws Exception {
+        logger.info("Starting {} clustering with eps={}, minPts={}, minClusterSize={}, lngField={}, latField={}, timeField={}, timeEps={}", 
+                algorithm, eps, minPts, minClusterSize, lngField, latField, timeField, timeEps);
         
         try {
             // 解析CSV文件
-            List<DBSCAN.Point> points = parseCSV(inputStream, lngField, latField);
+            List<DBSCAN.Point> points = parseCSV(inputStream, lngField, latField, timeField, algorithm);
             logger.info("Parsed {} points from CSV file", points.size());
             
             // 执行聚类算法
@@ -41,12 +48,15 @@ public class ClusterService {
             if ("hdbscan".equalsIgnoreCase(algorithm)) {
                 HDBSCAN hdbscan = new HDBSCAN(eps, minPts, minClusterSize);
                 clusters = hdbscan.cluster(points);
+            } else if ("stdbscan".equalsIgnoreCase(algorithm)) {
+                ST_DBSCAN stdbscan = new ST_DBSCAN(eps, minPts, minClusterSize, timeEps);
+                clusters = stdbscan.cluster(points);
             } else {
                 // 默认使用DBSCAN
                 DBSCAN dbscan = new DBSCAN(eps, minPts, minClusterSize);
                 clusters = dbscan.cluster(points);
             }
-            logger.info("Clustering completed: {} clusters found", clusters.size());
+            logger.info("Clustering completed: {} raw clusters found", clusters.size());
             
             // 构建响应
             ClusterResponse response = buildResponse(points, clusters, minClusterSize);
@@ -68,44 +78,43 @@ public class ClusterService {
         }
     }
 
-    private List<DBSCAN.Point> parseCSV(InputStream inputStream, String lngField, String latField) throws Exception {
+    private List<DBSCAN.Point> parseCSV(InputStream inputStream, String lngField, String latField, String timeField, String algorithm) throws Exception {
         List<DBSCAN.Point> points = new ArrayList<>();
+        boolean isSTDBScan = "stdbscan".equalsIgnoreCase(algorithm);
         try (Reader reader = new InputStreamReader(inputStream);
              CSVParser csvParser = new CSVParser(reader, CSVFormat.DEFAULT.withFirstRecordAsHeader())) {
-            // 流式处理CSV记录
             csvParser.forEach(csvRecord -> {
                 try {
-                    // 尝试根据指定字段名解析经纬度
-                    double lng, lat;
-                    try {
-                        lng = Double.parseDouble(csvRecord.get(lngField));
-                        lat = Double.parseDouble(csvRecord.get(latField));
-                    } catch (Exception e) {
-                        // 如果指定字段不存在或解析失败，尝试解析所有数值字段
-                        List<Double> coordinates = new ArrayList<>();
-                        for (String value : csvRecord) {
-                            try {
-                                coordinates.add(Double.parseDouble(value));
-                            } catch (NumberFormatException ex) {
-                                // 跳过非数值字段
-                                logger.debug("Skipping non-numeric field: {}", value);
-                            }
-                        }
-                        
-                        if (coordinates.size() >= 2) {
-                            double[] coordArray = coordinates.stream().mapToDouble(Double::doubleValue).toArray();
-                            points.add(new DBSCAN.Point(coordArray, csvRecord.toMap()));
-                        } else {
-                            logger.warn("Skipping record with insufficient numeric fields: {}", csvRecord);
-                        }
+                    // Always check for lng and lat fields
+                    if (!csvRecord.isMapped(lngField) || !csvRecord.isMapped(latField)) {
+                        logger.warn("Skipping record due to missing required fields (lngField or latField): {}", csvRecord);
                         return;
                     }
-                    
-                    // 使用经纬度创建点
+
+                    double lng = Double.parseDouble(csvRecord.get(lngField));
+                    double lat = Double.parseDouble(csvRecord.get(latField));
+                    long timestamp = 0L; // Default timestamp for non-ST-DBSCAN or if timeField is not present/needed
+
+                    if (isSTDBScan) {
+                        if (!csvRecord.isMapped(timeField)) {
+                            logger.warn("Skipping record for ST-DBSCAN due to missing timeField '{}': {}", timeField, csvRecord);
+                            return;
+                        }
+                        try {
+                            LocalDateTime ldt = LocalDateTime.parse(csvRecord.get(timeField), DATE_FORMAT);
+                            timestamp = ldt.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+                        } catch (DateTimeParseException e) {
+                            logger.warn("Skipping record for ST-DBSCAN due to timeField '{}' format exception: {}", timeField, csvRecord, e);
+                            return;
+                        }
+                    }
+
                     double[] coordArray = {lng, lat};
-                    points.add(new DBSCAN.Point(coordArray, csvRecord.toMap()));
+                    points.add(new DBSCAN.Point(coordArray, timestamp, csvRecord.toMap()));
+                } catch (NumberFormatException e) {
+                    logger.warn("Skipping record due to number format exception in coordinates: {}", csvRecord, e);
                 } catch (Exception e) {
-                    logger.warn("Skipping invalid record: {}", csvRecord);
+                    logger.warn("Skipping invalid record due to unexpected error: {}", csvRecord, e);
                 }
             });
         }
@@ -147,6 +156,7 @@ public class ClusterService {
         ClusterResponse response = new ClusterResponse();
         response.setTotalClusters(validClusters.size());
         response.setTotalPoints(points.size());
+        logger.info("Building response: {} valid clusters after minClusterSize filtering", validClusters.size());
 
         // 统计噪声点并收集噪声点信息
         int noiseCount = 0;
